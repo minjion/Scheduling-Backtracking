@@ -60,7 +60,7 @@ class SchedulerApp:
             row=0, column=2, padx=4
         )
 
-        columns = ("duration", "deadline", "release")
+        columns = ("name", "duration", "deadline", "release")
         self.tree = ttk.Treeview(
             frame,
             columns=columns,
@@ -68,9 +68,11 @@ class SchedulerApp:
             height=8,
             selectmode="browse",
         )
+        self.tree.heading("name", text="Tên")
         self.tree.heading("duration", text="Thời lượng")
         self.tree.heading("deadline", text="Deadline")
         self.tree.heading("release", text="Release")
+        self.tree.column("name", width=90, anchor="center")
         self.tree.column("duration", width=90, anchor="center")
         self.tree.column("deadline", width=80, anchor="center")
         self.tree.column("release", width=80, anchor="center")
@@ -167,7 +169,7 @@ class SchedulerApp:
 
         task = Task(name=name, duration=duration, deadline=deadline, release_time=release)
         self.tasks.append(task)
-        self.tree.insert("", "end", iid=name, values=(duration, deadline, release))
+        self.tree.insert("", "end", iid=name, values=(name, duration, deadline, release))
 
     def _remove_task(self) -> None:
         selection = self.tree.selection()
@@ -180,10 +182,10 @@ class SchedulerApp:
 
     def _load_demo_tasks(self) -> None:
         demo = [
-            Task("Job A", duration=3, deadline=8, release_time=0),
-            Task("Job B", duration=2, deadline=5, release_time=1),
-            Task("Job C", duration=4, deadline=12, release_time=0),
-            Task("Job D", duration=1, deadline=4, release_time=0),
+            Task("A", duration=3, deadline=8, release_time=0),
+            Task("B", duration=2, deadline=5, release_time=1),
+            Task("C", duration=4, deadline=12, release_time=0),
+            Task("D", duration=1, deadline=4, release_time=0),
         ]
         self.tasks = demo
         for item in self.tree.get_children():
@@ -191,7 +193,10 @@ class SchedulerApp:
 
         for task in demo:
             self.tree.insert(
-                "", "end", iid=task.name, values=(task.duration, task.deadline, task.release_time)
+                "",
+                "end",
+                iid=task.name,
+                values=(task.name, task.duration, task.deadline, task.release_time),
             )
 
     def _read_common_params(self) -> tuple[int, int]:
