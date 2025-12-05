@@ -8,13 +8,6 @@
 - Python 3.8+ có Tkinter (đi kèm trình cài đặt Python chính thức).
 - Không cần thư viện ngoài.
 
-## Cài đặt (tùy chọn dùng môi trường ảo)
-```bash
-python -m venv .venv
-.\.venv\Scripts\activate        # Windows
-# hoặc: source .venv/bin/activate # Linux/macOS
-```
-
 ## Chạy giao diện
 ```bash
 python app.py
@@ -23,7 +16,7 @@ python app.py
 - Kiểm tra Tkinter: `python - <<\"PY\"\nimport tkinter; print('OK')\nPY`.
 
 ## Cách dùng nhanh (GUI)
-- Nhập công việc (Tên, Thời lượng, Deadline, Release, Tiên quyết), bấm **Thêm**; **Xóa** để bỏ mục chọn; **Demo** để nạp dữ liệu mẫu. Tiên quyết nhập danh sách tên job cách nhau bởi dấu phẩy, nghĩa là job phải bắt đầu sau khi các job đó kết thúc.
+- Nhập công việc (Tên, Thời lượng, Deadline, Release). Tiên quyết chọn trong danh sách các job đã có (multi-select) để chỉ định job phải bắt đầu sau khi các job đó kết thúc. Bấm **Thêm**; **Xóa** để bỏ mục chọn; **Demo** để nạp dữ liệu mẫu.
 - Thiết lập **Horizon**, **Bước thời gian** (backtracking), **Pack size**, **Số vòng lặp** (GWO).
 - Bấm **Chạy Backtracking** hoặc **Chạy GWO** để xem lịch; **So sánh** chạy cả hai, hiển thị thời gian chạy (ms), tổng độ trễ và thuật toán tốt hơn.
 
