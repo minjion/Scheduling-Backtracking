@@ -48,8 +48,19 @@ class SchedulerApp:
             row=3, column=1, sticky="ew", pady=2
         )
 
+        ttk.Label(frame, text="Tiên quyết (chọn nhiều)").grid(row=4, column=0, sticky="nw")
+        pred_container = ttk.Frame(frame)
+        pred_container.grid(row=4, column=1, sticky="nsew", pady=2)
+        self.pred_list = tk.Listbox(pred_container, selectmode="extended", height=5, exportselection=False)
+        self.pred_list.grid(row=0, column=0, sticky="nsew")
+        pred_scroll = ttk.Scrollbar(pred_container, orient="vertical", command=self.pred_list.yview)
+        pred_scroll.grid(row=0, column=1, sticky="ns")
+        self.pred_list.configure(yscrollcommand=pred_scroll.set)
+        pred_container.columnconfigure(0, weight=1)
+        frame.rowconfigure(4, weight=1)
+
         btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=4, column=0, columnspan=2, pady=4, sticky="ew")
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=4, sticky="ew")
         ttk.Button(btn_frame, text="Thêm", command=self._add_task).grid(
             row=0, column=0, padx=4
         )
@@ -60,7 +71,7 @@ class SchedulerApp:
             row=0, column=2, padx=4
         )
 
-        columns = ("name", "duration", "deadline", "release")
+        columns = ("name", "duration", "deadline", "release", "preds")
         self.tree = ttk.Treeview(
             frame,
             columns=columns,
@@ -72,11 +83,13 @@ class SchedulerApp:
         self.tree.heading("duration", text="Thời lượng")
         self.tree.heading("deadline", text="Deadline")
         self.tree.heading("release", text="Release")
+        self.tree.heading("preds", text="Tiên quyết")
         self.tree.column("name", width=90, anchor="center")
         self.tree.column("duration", width=90, anchor="center")
         self.tree.column("deadline", width=80, anchor="center")
         self.tree.column("release", width=80, anchor="center")
-        self.tree.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=4)
+        self.tree.column("preds", width=140, anchor="center")
+        self.tree.grid(row=6, column=0, columnspan=2, sticky="nsew", pady=4)
 
         frame.columnconfigure(1, weight=1)
 
@@ -145,6 +158,12 @@ class SchedulerApp:
         self.root.rowconfigure(3, weight=1)
         self.root.columnconfigure(0, weight=1)
 
+    def _refresh_pred_list(self) -> None:
+        names = sorted({t.name for t in self.tasks})
+        self.pred_list.delete(0, tk.END)
+        for name in names:
+            self.pred_list.insert(tk.END, name)
+
     def _add_task(self) -> None:
         name = self.name_var.get().strip()
         if not name:
@@ -167,9 +186,23 @@ class SchedulerApp:
             messagebox.showerror("Lỗi", "Tên công việc phải duy nhất")
             return
 
-        task = Task(name=name, duration=duration, deadline=deadline, release_time=release)
+        preds = [self.pred_list.get(i) for i in self.pred_list.curselection()]
+
+        task = Task(
+            name=name,
+            duration=duration,
+            deadline=deadline,
+            release_time=release,
+            predecessors=preds,
+        )
         self.tasks.append(task)
-        self.tree.insert("", "end", iid=name, values=(name, duration, deadline, release))
+        self.tree.insert(
+            "",
+            "end",
+            iid=name,
+            values=(name, duration, deadline, release, ", ".join(preds)),
+        )
+        self._refresh_pred_list()
 
     def _remove_task(self) -> None:
         selection = self.tree.selection()
@@ -179,11 +212,16 @@ class SchedulerApp:
         item_id = selection[0]
         self.tree.delete(item_id)
         self.tasks = [t for t in self.tasks if t.name != item_id]
+        for task in self.tasks:
+            if item_id in task.predecessors:
+                task.predecessors = [p for p in task.predecessors if p != item_id]
+                self.tree.set(task.name, "preds", ", ".join(task.predecessors))
+        self._refresh_pred_list()
 
     def _load_demo_tasks(self) -> None:
         demo = [
             Task("A", duration=3, deadline=8, release_time=0),
-            Task("B", duration=2, deadline=5, release_time=1),
+            Task("B", duration=2, deadline=5, release_time=1, predecessors=["D"]),
             Task("C", duration=4, deadline=12, release_time=0),
             Task("D", duration=1, deadline=4, release_time=0),
         ]
@@ -192,12 +230,14 @@ class SchedulerApp:
             self.tree.delete(item)
 
         for task in demo:
+            preds_display = ", ".join(task.predecessors) if task.predecessors else ""
             self.tree.insert(
                 "",
                 "end",
                 iid=task.name,
-                values=(task.name, task.duration, task.deadline, task.release_time),
+                values=(task.name, task.duration, task.deadline, task.release_time, preds_display),
             )
+        self._refresh_pred_list()
 
     def _read_common_params(self) -> tuple[int, int]:
         try:

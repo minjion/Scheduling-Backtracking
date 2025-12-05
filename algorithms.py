@@ -14,6 +14,7 @@ def compute_metrics(
     """Return (total_tardiness, feasible_flag) for a concrete schedule."""
 
     task_map = {t.name: t for t in tasks}
+    placement = {name: (start, end) for name, start, end in schedule}
     tardiness = 0.0
     feasible = True
     ordered = sorted(schedule, key=lambda entry: entry[1])
@@ -31,6 +32,15 @@ def compute_metrics(
             feasible = False
 
         tardiness += max(0, end - task.deadline)
+
+        # Precedence constraints: start >= end of all predecessors.
+        for pred in task.predecessors:
+            pred_times = placement.get(pred)
+            if pred_times is None:
+                feasible = False
+                continue
+            if start < pred_times[1]:
+                feasible = False
 
     # Ensure we scheduled every task exactly once.
     if len(task_map) != len(ordered):
@@ -55,10 +65,25 @@ def backtracking_schedule(
             feasible=True,
         )
 
-    tasks_sorted = sorted(tasks, key=lambda t: (t.deadline, -t.duration))
+    task_map = {t.name: t for t in tasks}
+    # Detect missing predecessors.
+    for t in tasks:
+        for pred in t.predecessors:
+            if pred not in task_map:
+                runtime_ms = (time.perf_counter() - start_time) * 1000
+                return ScheduleResult(
+                    algo="Backtracking",
+                    schedule=[],
+                    total_tardiness=math.inf,
+                    runtime_ms=runtime_ms,
+                    feasible=False,
+                )
+
     best_schedule: Optional[List[Tuple[str, int, int]]] = None
     best_score = math.inf
     placed: List[Tuple[str, int, int]] = []
+    placed_map: dict[str, Tuple[int, int]] = {}
+    remaining: List[Task] = tasks.copy()
 
     def overlaps(start: int, duration: int) -> bool:
         end = start + duration
@@ -70,35 +95,49 @@ def backtracking_schedule(
                 return True
         return False
 
-    def search(idx: int, current_cost: float) -> None:
+    def search(current_cost: float) -> None:
         nonlocal best_schedule, best_score
 
-        if idx == len(tasks_sorted):
+        if not remaining:
             snapshot = sorted(placed.copy(), key=lambda entry: entry[1])
             best_schedule = snapshot
             best_score = current_cost
             return
 
-        task = tasks_sorted[idx]
-        latest_start = max(task.release_time, horizon - task.duration)
+        candidates = [
+            t for t in remaining if all(pred in placed_map for pred in t.predecessors)
+        ]
+        if not candidates:
+            return
 
-        for start in range(task.release_time, latest_start + 1, step):
-            if overlaps(start, task.duration):
-                continue
+        candidates.sort(key=lambda t: (t.deadline, -t.duration))
 
-            end = start + task.duration
-            tardiness = max(0, end - task.deadline)
-            next_cost = current_cost + tardiness
+        for task in candidates:
+            preds_end = max((placed_map[p][1] for p in task.predecessors), default=task.release_time)
+            earliest_start = max(task.release_time, preds_end)
+            latest_start = max(earliest_start, horizon - task.duration)
 
-            # Branch and bound: prune if already worse than best known.
-            if next_cost >= best_score:
-                continue
+            for start in range(earliest_start, latest_start + 1, step):
+                if overlaps(start, task.duration):
+                    continue
 
-            placed.append((task.name, start, end))
-            search(idx + 1, next_cost)
-            placed.pop()
+                end = start + task.duration
+                tardiness = max(0, end - task.deadline)
+                next_cost = current_cost + tardiness
 
-    search(0, 0.0)
+                # Branch and bound: prune if already worse than best known.
+                if next_cost >= best_score:
+                    continue
+
+                placed.append((task.name, start, end))
+                placed_map[task.name] = (start, end)
+                remaining.remove(task)
+                search(next_cost)
+                remaining.append(task)
+                placed.pop()
+                placed_map.pop(task.name, None)
+
+    search(0.0)
     runtime_ms = (time.perf_counter() - start_time) * 1000
 
     if best_schedule is None:
@@ -124,11 +163,12 @@ def backtracking_schedule(
 def _score_position(
     tasks: List[Task], position: List[float], bounds: List[Tuple[int, int]], horizon: int
 ) -> float:
-    """Objective: tardiness + overlap/out-of-window penalties."""
+    """Objective: tardiness + overlap/out-of-window + precedence penalties."""
 
     tardiness = 0.0
     penalty = 0.0
-    entries: List[Tuple[float, float]] = []
+    entries: List[Tuple[float, float, str]] = []
+    placement: dict[str, Tuple[float, float]] = {}
 
     for idx, value in enumerate(position):
         lo, hi = bounds[idx]
@@ -137,22 +177,61 @@ def _score_position(
         end = start + task.duration
         tardiness += max(0.0, end - task.deadline)
 
-        # Penalize if we cannot fit the job.
         if end > horizon or start < task.release_time:
             penalty += 50.0
 
-        entries.append((start, end))
+        entries.append((start, end, task.name))
+        placement[task.name] = (start, end)
 
     entries.sort(key=lambda item: item[0])
 
-    # Penalize pairwise overlaps so the swarm learns to separate tasks.
     for i in range(len(entries)):
         for j in range(i + 1, len(entries)):
             overlap = max(0.0, entries[i][1] - entries[j][0])
             if overlap > 0:
                 penalty += overlap * 10.0
 
+    for task in tasks:
+        for pred in task.predecessors:
+            pred_times = placement.get(pred)
+            cur_times = placement.get(task.name)
+            if pred_times is None or cur_times is None:
+                penalty += 100.0
+                continue
+            if cur_times[0] < pred_times[1]:
+                penalty += (pred_times[1] - cur_times[0]) * 20.0
+
     return tardiness + penalty
+
+
+def _topological_order(tasks: List[Task]) -> Optional[List[Task]]:
+    """Return tasks in a topological order respecting predecessors, or None if cycle/missing."""
+
+    task_map = {t.name: t for t in tasks}
+    indegree = {t.name: 0 for t in tasks}
+    for t in tasks:
+        for pred in t.predecessors:
+            if pred not in task_map:
+                return None
+            indegree[t.name] += 1
+
+    queue = [t for t in tasks if indegree[t.name] == 0]
+    queue.sort(key=lambda t: (t.deadline, -t.duration))
+    ordered: List[Task] = []
+
+    while queue:
+        current = queue.pop(0)
+        ordered.append(current)
+        for succ in tasks:
+            if current.name in succ.predecessors:
+                indegree[succ.name] -= 1
+                if indegree[succ.name] == 0:
+                    queue.append(succ)
+        queue.sort(key=lambda t: (t.deadline, -t.duration))
+
+    if len(ordered) != len(tasks):
+        return None
+    return ordered
 
 
 def _positions_to_schedule(
@@ -160,26 +239,31 @@ def _positions_to_schedule(
 ) -> List[Tuple[str, int, int]]:
     """Convert a continuous position vector to a feasible, non-overlapping schedule."""
 
-    blocks: List[Tuple[float, float, Task]] = []
+    raw_starts = []
     for idx, task in enumerate(tasks):
         lo, hi = bounds[idx]
-        start = max(lo, min(position[idx], hi))
-        end = start + task.duration
-        blocks.append((start, end, task))
+        raw_starts.append(max(lo, min(position[idx], hi)))
 
-    blocks.sort(key=lambda entry: entry[0])
+    topo_tasks = _topological_order(tasks) or tasks
     schedule: List[Tuple[str, int, int]] = []
     current_time = 0.0
+    end_map: dict[str, float] = {}
+    start_map: dict[str, float] = {}
 
-    for start, end, task in blocks:
-        start = max(start, current_time, task.release_time)
+    for task in topo_tasks:
+        idx = tasks.index(task)
+        base_start = raw_starts[idx]
+        preds_end = max((end_map[p] for p in task.predecessors if p in end_map), default=task.release_time)
+        start = max(base_start, current_time, task.release_time, preds_end)
         end = start + task.duration
 
         if end > horizon:
-            start = max(task.release_time, horizon - task.duration)
+            start = max(task.release_time, preds_end, current_time, horizon - task.duration)
             end = start + task.duration
 
         schedule.append((task.name, int(round(start)), int(round(end))))
+        start_map[task.name] = start
+        end_map[task.name] = end
         current_time = end
 
     return schedule

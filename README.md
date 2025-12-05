@@ -23,7 +23,7 @@ python app.py
 - Kiểm tra Tkinter: `python - <<\"PY\"\nimport tkinter; print('OK')\nPY`.
 
 ## Cách dùng nhanh (GUI)
-- Nhập công việc (Tên, Thời lượng, Deadline, Release), bấm **Thêm**; **Xóa** để bỏ mục chọn; **Demo** để nạp dữ liệu mẫu.
+- Nhập công việc (Tên, Thời lượng, Deadline, Release, Tiên quyết), bấm **Thêm**; **Xóa** để bỏ mục chọn; **Demo** để nạp dữ liệu mẫu. Tiên quyết nhập danh sách tên job cách nhau bởi dấu phẩy, nghĩa là job phải bắt đầu sau khi các job đó kết thúc.
 - Thiết lập **Horizon**, **Bước thời gian** (backtracking), **Pack size**, **Số vòng lặp** (GWO).
 - Bấm **Chạy Backtracking** hoặc **Chạy GWO** để xem lịch; **So sánh** chạy cả hai, hiển thị thời gian chạy (ms), tổng độ trễ và thuật toán tốt hơn.
 
