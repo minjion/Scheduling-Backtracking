@@ -1,33 +1,39 @@
-# Scheduling – Backtracking vs PSO
+# Lập lịch đơn máy — Backtracking vs GWO
 
-Ứng dụng minh họa giải bài toán xếp lịch với hai thuật toán:
-- **Backtracking** trên miền thời gian rời rạc (tìm kiếm toàn bộ, có cắt nhánh).
-- **Particle Swarm Optimization (PSO)** tối ưu tổng độ trễ, phạt khi trùng lịch.
+Ứng dụng GUI nhỏ minh họa bài toán sắp xếp lịch đơn máy với hai thuật toán:
+- **Backtracking** trên lưới thời gian rời rạc (DFS + cắt nhánh).
+- **Grey Wolf Optimizer (GWO)** trên thời điểm liên tục, sau đó chiếu về lịch khả thi.
 
 ## Yêu cầu
-- Python 3.8+ có Tkinter (cài từ https://www.python.org/downloads/).
+- Python 3.8+ có Tkinter (đi kèm trình cài đặt Python chính thức).
 - Không cần thư viện ngoài.
 
-## Cài đặt (tùy chọn môi trường ảo)
+## Cài đặt (tùy chọn dùng môi trường ảo)
 ```bash
 python -m venv .venv
 .\.venv\Scripts\activate        # Windows
-# hoặc: source .venv/bin/activate  # Linux/macOS
+# hoặc: source .venv/bin/activate # Linux/macOS
 ```
 
-## Chạy ứng dụng
+## Chạy giao diện
 ```bash
-cd "(ổ đĩa cài đặt):\\(tên thư mục cài đặt)" ví dụ cd d:\\Scheduling-Backtracking
 python app.py
 ```
-- Nếu lệnh `python` mở Microsoft Store, tắt App Execution Aliases trong Settings > Apps > Advanced app settings.
-- Kiểm tra Tkinter: `python - <<\"PY\"\nimport tkinter; print('OK')\nPY`. Nếu lỗi, cài lại Python và bật tùy chọn “tcl/tk and IDLE”.
+- Nếu lệnh `python` mở Microsoft Store, tắt App Execution Aliases (Settings > Apps > Advanced app settings).
+- Kiểm tra Tkinter: `python - <<\"PY\"\nimport tkinter; print('OK')\nPY`.
 
-## Cách dùng
+## Cách dùng nhanh (GUI)
 - Nhập công việc (Tên, Thời lượng, Deadline, Release), bấm **Thêm**; **Xóa** để bỏ mục chọn; **Demo** để nạp dữ liệu mẫu.
-- Thiết lập **Horizon**, **Bước thời gian** (backtracking), **Swarm size**, **Số vòng lặp** (PSO).
-- Bấm **Chạy Backtracking** hoặc **Chạy PSO** để xem lịch; **So sánh** chạy cả hai, hiển thị thời gian chạy (ms) và tổng độ trễ, chỉ ra lời giải tốt hơn.
+- Thiết lập **Horizon**, **Bước thời gian** (backtracking), **Pack size**, **Số vòng lặp** (GWO).
+- Bấm **Chạy Backtracking** hoặc **Chạy GWO** để xem lịch; **So sánh** chạy cả hai, hiển thị thời gian chạy (ms), tổng độ trễ và thuật toán tốt hơn.
 
-## Ghi chú thuật toán
-- **Backtracking**: sắp xếp công việc theo deadline, thử các mốc bắt đầu với bước `step`, cắt nhánh khi tổng độ trễ hiện tại đã tệ hơn lời giải tốt nhất.
-- **PSO**: mỗi hạt là vector thời điểm bắt đầu; hàm mục tiêu = tổng độ trễ + phạt trùng lịch; sau khi hội tụ, thời điểm được sắp xếp và đẩy để không trùng nhau.
+## So sánh hiệu năng nhiều kịch bản (batch)
+Chạy nhanh các kịch bản mẫu, xem bảng tổng hợp độ trễ và thời gian chạy:
+```bash
+python benchmark.py
+```
+Kịch bản gồm: deadline gắt, release lệch pha, quá tải gần deadline và bộ ngẫu nhiên có seed cố định. Bảng kết quả cho biết tổng độ trễ và thời gian chạy của mỗi thuật toán trong từng kịch bản để so sánh.
+
+## Thuật toán
+- **Backtracking**: sắp xếp công việc theo deadline, thử các mốc bắt đầu với bước `step`, cắt nhánh khi chi phí hiện tại đã tệ hơn nghiệm tốt nhất.
+- **GWO**: mỗi “sói” là vector thời điểm bắt đầu; hàm mục tiêu = tổng độ trễ + phạt vi phạm cửa sổ + phạt chồng lắp; cập nhật theo alpha/beta/delta, sau hội tụ sắp xếp và đẩy mốc để không chồng lắp rồi cắt về miền khả thi.

@@ -3,14 +3,14 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import List
 
-from algorithms import backtracking_schedule, describe_schedule, pso_schedule
+from algorithms import backtracking_schedule, describe_schedule, gwo_schedule
 from models import Task
 
 
 class SchedulerApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Scheduling - Backtracking vs PSO")
+        self.root.title("Scheduling - Backtracking vs GWO")
         self.tasks: List[Task] = []
 
         self._build_task_form()
@@ -28,7 +28,7 @@ class SchedulerApp:
         self.deadline_var = tk.StringVar(value="6")
         self.release_var = tk.StringVar(value="0")
 
-        ttk.Label(frame, text="Ten").grid(row=0, column=0, sticky="w")
+        ttk.Label(frame, text="Tên").grid(row=0, column=0, sticky="w")
         ttk.Entry(frame, textvariable=self.name_var, width=20).grid(
             row=0, column=1, sticky="ew", pady=2
         )
@@ -101,12 +101,12 @@ class SchedulerApp:
             row=1, column=1, sticky="ew", pady=2
         )
 
-        ttk.Label(frame, text="Swarm size (PSO)").grid(row=2, column=0, sticky="w")
+        ttk.Label(frame, text="Pack size (GWO)").grid(row=2, column=0, sticky="w")
         ttk.Entry(frame, textvariable=self.swarm_var, width=10).grid(
             row=2, column=1, sticky="ew", pady=2
         )
 
-        ttk.Label(frame, text="Số vòng lặp (PSO)").grid(row=3, column=0, sticky="w")
+        ttk.Label(frame, text="Số vòng lặp (GWO)").grid(row=3, column=0, sticky="w")
         ttk.Entry(frame, textvariable=self.iter_var, width=10).grid(
             row=3, column=1, sticky="ew", pady=2
         )
@@ -120,7 +120,7 @@ class SchedulerApp:
         ttk.Button(frame, text="Chạy Backtracking", command=self.run_backtracking).grid(
             row=0, column=0, padx=4
         )
-        ttk.Button(frame, text="Chạy PSO", command=self.run_pso).grid(
+        ttk.Button(frame, text="Chạy GWO", command=self.run_gwo).grid(
             row=0, column=1, padx=4
         )
         ttk.Button(frame, text="So sánh", command=self.compare_algorithms).grid(
@@ -206,17 +206,17 @@ class SchedulerApp:
 
         return horizon, step
 
-    def _read_pso_params(self) -> tuple[int, int]:
+    def _read_gwo_params(self) -> tuple[int, int]:
         try:
-            swarm = int(self.swarm_var.get())
+            pack = int(self.swarm_var.get())
             iterations = int(self.iter_var.get())
         except ValueError:
-            raise ValueError("Swarm size và số vòng lặp phải là số nguyên")
+            raise ValueError("Pack size và số vòng lặp phải là số nguyên")
 
-        if swarm <= 0 or iterations <= 0:
-            raise ValueError("Swarm size và số vòng lặp phải lớn hơn 0")
+        if pack <= 0 or iterations <= 0:
+            raise ValueError("Pack size và số vòng lặp phải lớn hơn 0")
 
-        return swarm, iterations
+        return pack, iterations
 
     def run_backtracking(self) -> None:
         if not self.tasks:
@@ -232,22 +232,22 @@ class SchedulerApp:
         result = backtracking_schedule(self.tasks, horizon=horizon, step=step)
         self._show_result(result)
 
-    def run_pso(self) -> None:
+    def run_gwo(self) -> None:
         if not self.tasks:
             messagebox.showwarning("Lỗi", "Chưa có công việc nào")
             return
 
         try:
             horizon, _ = self._read_common_params()
-            swarm, iterations = self._read_pso_params()
+            pack, iterations = self._read_gwo_params()
         except ValueError as exc:
             messagebox.showerror("Lỗi", str(exc))
             return
 
-        result = pso_schedule(
+        result = gwo_schedule(
             self.tasks,
             horizon=horizon,
-            swarm_size=swarm,
+            pack_size=pack,
             iterations=iterations,
         )
         self._show_result(result)
@@ -259,24 +259,24 @@ class SchedulerApp:
 
         try:
             horizon, step = self._read_common_params()
-            swarm, iterations = self._read_pso_params()
+            pack, iterations = self._read_gwo_params()
         except ValueError as exc:
             messagebox.showerror("Lỗi", str(exc))
             return
 
         backtracking = backtracking_schedule(self.tasks, horizon=horizon, step=step)
-        pso = pso_schedule(self.tasks, horizon=horizon, swarm_size=swarm, iterations=iterations)
+        gwo = gwo_schedule(self.tasks, horizon=horizon, pack_size=pack, iterations=iterations)
 
         summary = [
             "=== Backtracking ===",
             describe_schedule(backtracking),
             "",
-            "=== PSO ===",
-            describe_schedule(pso),
+            "=== GWO ===",
+            describe_schedule(gwo),
         ]
 
-        if backtracking.total_tardiness != math.inf and pso.total_tardiness != math.inf:
-            better = "Backtracking" if backtracking.total_tardiness <= pso.total_tardiness else "PSO"
+        if backtracking.total_tardiness != math.inf and gwo.total_tardiness != math.inf:
+            better = "Backtracking" if backtracking.total_tardiness <= gwo.total_tardiness else "GWO"
             summary.append(f"\nGiải pháp tốt hơn: {better}")
 
         self._show_text("\n".join(summary))

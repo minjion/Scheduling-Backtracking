@@ -124,7 +124,7 @@ def backtracking_schedule(
 def _score_position(
     tasks: List[Task], position: List[float], bounds: List[Tuple[int, int]], horizon: int
 ) -> float:
-    """Objective for PSO: tardiness + overlap/out-of-window penalties."""
+    """Objective: tardiness + overlap/out-of-window penalties."""
 
     tardiness = 0.0
     penalty = 0.0
@@ -145,7 +145,7 @@ def _score_position(
 
     entries.sort(key=lambda item: item[0])
 
-    # Penalize pairwise overlaps so the swarm learns to separate tasks.
+    # Penalize pairwise overlaps so the optimizer learns to separate tasks.
     for i in range(len(entries)):
         for j in range(i + 1, len(entries)):
             overlap = max(0.0, entries[i][1] - entries[j][0])
@@ -158,7 +158,7 @@ def _score_position(
 def _positions_to_schedule(
     tasks: List[Task], position: List[float], bounds: List[Tuple[int, int]], horizon: int
 ) -> List[Tuple[str, int, int]]:
-    """Convert swarm position to a feasible, non-overlapping schedule."""
+    """Convert a continuous position vector to a feasible, non-overlapping schedule."""
 
     blocks: List[Tuple[float, float, Task]] = []
     for idx, task in enumerate(tasks):
@@ -185,22 +185,19 @@ def _positions_to_schedule(
     return schedule
 
 
-def pso_schedule(
+def gwo_schedule(
     tasks: List[Task],
     horizon: int,
-    swarm_size: int = 30,
+    pack_size: int = 30,
     iterations: int = 80,
-    inertia: float = 0.6,
-    c1: float = 1.5,
-    c2: float = 1.5,
 ) -> ScheduleResult:
-    """Particle Swarm Optimization for the same scheduling objective."""
+    """Grey Wolf Optimizer for the same scheduling objective."""
 
     start_time = time.perf_counter()
     if not tasks:
         runtime_ms = (time.perf_counter() - start_time) * 1000
         return ScheduleResult(
-            algo="PSO",
+            algo="GWO",
             schedule=[],
             total_tardiness=0.0,
             runtime_ms=runtime_ms,
@@ -214,55 +211,81 @@ def pso_schedule(
         bounds.append((task.release_time, latest_start))
 
     dim = len(tasks)
-    positions: List[List[float]] = []
-    velocities: List[List[float]] = []
-    personal_best: List[List[float]] = []
-    personal_scores: List[float] = []
+    wolves: List[List[float]] = []
 
-    for _ in range(swarm_size):
+    alpha_pos: Optional[List[float]] = None
+    beta_pos: Optional[List[float]] = None
+    delta_pos: Optional[List[float]] = None
+    alpha_score = math.inf
+    beta_score = math.inf
+    delta_score = math.inf
+
+    for _ in range(pack_size):
         pos = [random.uniform(lo, hi) for lo, hi in bounds]
-        vel = [0.0 for _ in range(dim)]
-        positions.append(pos)
-        velocities.append(vel)
-        personal_best.append(pos.copy())
-        personal_scores.append(_score_position(tasks, pos, bounds, horizon))
+        wolves.append(pos)
+        score = _score_position(tasks, pos, bounds, horizon)
+        if score < alpha_score:
+            delta_score, delta_pos = beta_score, beta_pos
+            beta_score, beta_pos = alpha_score, alpha_pos
+            alpha_score, alpha_pos = score, pos.copy()
+        elif score < beta_score:
+            delta_score, delta_pos = beta_score, beta_pos
+            beta_score, beta_pos = score, pos.copy()
+        elif score < delta_score:
+            delta_score, delta_pos = score, pos.copy()
 
-    global_best_idx = min(range(swarm_size), key=lambda i: personal_scores[i])
-    global_best = personal_best[global_best_idx].copy()
-    global_best_score = personal_scores[global_best_idx]
-
-    for _ in range(iterations):
-        for i in range(swarm_size):
-            current_score = _score_position(tasks, positions[i], bounds, horizon)
-            if current_score < personal_scores[i]:
-                personal_scores[i] = current_score
-                personal_best[i] = positions[i].copy()
-
-        global_best_idx = min(range(swarm_size), key=lambda i: personal_scores[i])
-        if personal_scores[global_best_idx] < global_best_score:
-            global_best_score = personal_scores[global_best_idx]
-            global_best = personal_best[global_best_idx].copy()
-
-        for i in range(swarm_size):
+    for t in range(iterations):
+        a = 2 - 2 * (t / max(1, iterations))
+        for i in range(pack_size):
             for d in range(dim):
-                r1 = random.random()
-                r2 = random.random()
-                velocities[i][d] = (
-                    inertia * velocities[i][d]
-                    + c1 * r1 * (personal_best[i][d] - positions[i][d])
-                    + c2 * r2 * (global_best[d] - positions[i][d])
-                )
-                positions[i][d] += velocities[i][d]
+                r1, r2 = random.random(), random.random()
+                r3, r4 = random.random(), random.random()
+                r5, r6 = random.random(), random.random()
 
+                # If alpha/beta/delta are not set (degenerate), fall back to current position.
+                alpha_d = alpha_pos[d] if alpha_pos else wolves[i][d]
+                beta_d = beta_pos[d] if beta_pos else wolves[i][d]
+                delta_d = delta_pos[d] if delta_pos else wolves[i][d]
+
+                A1 = 2 * a * r1 - a
+                C1 = 2 * r2
+                D_alpha = abs(C1 * alpha_d - wolves[i][d])
+                X1 = alpha_d - A1 * D_alpha
+
+                A2 = 2 * a * r3 - a
+                C2 = 2 * r4
+                D_beta = abs(C2 * beta_d - wolves[i][d])
+                X2 = beta_d - A2 * D_beta
+
+                A3 = 2 * a * r5 - a
+                C3 = 2 * r6
+                D_delta = abs(C3 * delta_d - wolves[i][d])
+                X3 = delta_d - A3 * D_delta
+
+                new_pos = (X1 + X2 + X3) / 3.0
                 lo, hi = bounds[d]
-                positions[i][d] = max(lo, min(positions[i][d], hi))
+                wolves[i][d] = max(lo, min(new_pos, hi))
 
+        # Update alpha, beta, delta
+        for i in range(pack_size):
+            score = _score_position(tasks, wolves[i], bounds, horizon)
+            if score < alpha_score:
+                delta_score, delta_pos = beta_score, beta_pos
+                beta_score, beta_pos = alpha_score, alpha_pos
+                alpha_score, alpha_pos = score, wolves[i].copy()
+            elif score < beta_score:
+                delta_score, delta_pos = beta_score, beta_pos
+                beta_score, beta_pos = score, wolves[i].copy()
+            elif score < delta_score:
+                delta_score, delta_pos = score, wolves[i].copy()
+
+    best_position = alpha_pos if alpha_pos is not None else wolves[0]
     runtime_ms = (time.perf_counter() - start_time) * 1000
-    schedule = _positions_to_schedule(tasks, global_best, bounds, horizon)
+    schedule = _positions_to_schedule(tasks, best_position, bounds, horizon)
     total_tardiness, feasible = compute_metrics(tasks, schedule, horizon)
 
     return ScheduleResult(
-        algo="PSO",
+        algo="GWO",
         schedule=schedule,
         total_tardiness=total_tardiness,
         runtime_ms=runtime_ms,
