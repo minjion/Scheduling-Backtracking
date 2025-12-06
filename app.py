@@ -17,7 +17,6 @@ class SchedulerApp:
         self._build_params_section()
         self._build_actions()
         self._build_output()
-        self._load_demo_tasks()
 
     def _build_task_form(self) -> None:
         frame = ttk.LabelFrame(self.root, text="Nhập công việc")
