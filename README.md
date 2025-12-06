@@ -13,7 +13,6 @@
 python app.py
 ```
 - Nếu lệnh `python` mở Microsoft Store, tắt App Execution Aliases (Settings > Apps > Advanced app settings).
-- Kiểm tra Tkinter: `python - <<\"PY\"\nimport tkinter; print('OK')\nPY`.
 
 ## Cách dùng nhanh (GUI)
 - Nhập công việc (Tên, Thời lượng, Deadline, Release). Tiên quyết chọn trong danh sách các job đã có (multi-select) để chỉ định job phải bắt đầu sau khi các job đó kết thúc. Bấm **Thêm**; **Xóa** để bỏ mục chọn; **Demo** để nạp dữ liệu mẫu.
