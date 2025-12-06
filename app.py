@@ -181,6 +181,10 @@ class SchedulerApp:
             messagebox.showerror("Lỗi", "Thời lượng phải lớn hơn 0")
             return
 
+        if deadline < 0 or release < 0:
+            messagebox.showerror("Lỗi", "Deadline và Release phải là số không âm")
+            return
+
         if any(task.name == name for task in self.tasks):
             messagebox.showerror("Lỗi", "Tên công việc phải duy nhất")
             return
