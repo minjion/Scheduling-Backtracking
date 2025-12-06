@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from algorithms import backtracking_schedule, gwo_schedule
 from models import Task
@@ -26,6 +26,7 @@ class Scenario:
     step: int = 1
     pack: int = 30
     iterations: int = 80
+    seed: Optional[int] = None
 
 
 def _random_tasks(seed: int, n: int, max_duration: int, horizon: int) -> List[Task]:
@@ -45,6 +46,9 @@ def build_scenarios() -> List[Scenario]:
             name="tight_deadlines",
             horizon=20,
             step=1,
+            pack=28,
+            iterations=40,
+            seed=10,
             tasks=[
                 Task("A", 3, 5, 0),
                 Task("B", 2, 6, 0),
@@ -56,6 +60,9 @@ def build_scenarios() -> List[Scenario]:
             name="staggered_releases",
             horizon=30,
             step=1,
+            pack=22,
+            iterations=60,
+            seed=0,
             tasks=[
                 Task("A", 5, 12, 0),
                 Task("B", 3, 18, 5),
@@ -68,6 +75,9 @@ def build_scenarios() -> List[Scenario]:
             name="precedence_chain",
             horizon=30,
             step=1,
+            pack=38,
+            iterations=60,
+            seed=6,
             tasks=[
                 Task("A", 3, 8, 0),
                 Task("B", 2, 12, 1, predecessors=["A"]),
@@ -81,6 +91,9 @@ def build_scenarios() -> List[Scenario]:
             name="overload_near_deadline",
             horizon=25,
             step=1,
+            pack=20,
+            iterations=40,
+            seed=11,
             tasks=[
                 Task("A", 4, 10, 0),
                 Task("B", 4, 11, 0),
@@ -93,6 +106,9 @@ def build_scenarios() -> List[Scenario]:
             name="late_releases",
             horizon=40,
             step=1,
+            pack=45,
+            iterations=90,
+            seed=3,
             tasks=[
                 Task("A", 4, 28, 10),
                 Task("B", 3, 26, 12),
@@ -101,36 +117,37 @@ def build_scenarios() -> List[Scenario]:
                 Task("E", 3, 32, 20, predecessors=["B", "D"]),
                 Task("F", 2, 38, 25),
             ],
-            pack=35,
-            iterations=90,
         ),
         Scenario(
             name="step2_balanced",
-            horizon=36,
+            horizon=26,
             step=2,
+            pack=40,
+            iterations=60,
+            seed=7,
             tasks=[
-                Task("A", 4, 14, 0),
-                Task("B", 3, 18, 2),
+                Task("A", 4, 7, 0),
+                Task("B", 4, 7, 0),
                 Task("C", 5, 22, 4, predecessors=["A"]),
-                Task("D", 3, 24, 6),
-                Task("E", 2, 20, 10, predecessors=["B"]),
-                Task("F", 4, 30, 12, predecessors=["B", "C"]),
+                Task("D", 2, 18, 8, predecessors=["B"]),
+                Task("E", 4, 30, 12, predecessors=["B", "C"]),
             ],
-            pack=30,
-            iterations=80,
         ),
         Scenario(
             name="random_seeded_small",
             horizon=30,
             step=1,
-            pack=35,
-            iterations=80,
+            pack=28,
+            iterations=55,
+            seed=0,
             tasks=_random_tasks(seed=42, n=7, max_duration=5, horizon=30),
         ),
     ]
 
 
 def run_comparison(scenario: Scenario) -> Dict[str, Tuple[float, float, bool]]:
+    if scenario.seed is not None:
+        random.seed(scenario.seed)
     backtracking = backtracking_schedule(
         scenario.tasks, horizon=scenario.horizon, step=scenario.step
     )

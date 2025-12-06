@@ -221,9 +221,11 @@ class SchedulerApp:
     def _load_demo_tasks(self) -> None:
         demo = [
             Task("A", duration=3, deadline=8, release_time=0),
-            Task("B", duration=2, deadline=5, release_time=1, predecessors=["D"]),
-            Task("C", duration=4, deadline=12, release_time=0),
-            Task("D", duration=1, deadline=4, release_time=0),
+            Task("B", duration=2, deadline=7, release_time=2, predecessors=["A"]),
+            Task("C", duration=4, deadline=14, release_time=3, predecessors=["A"]),
+            Task("D", duration=1, deadline=5, release_time=0),
+            Task("E", duration=3, deadline=12, release_time=2),
+            Task("F", duration=2, deadline=16, release_time=6, predecessors=["C", "E"]),
         ]
         self.tasks = demo
         for item in self.tree.get_children():
